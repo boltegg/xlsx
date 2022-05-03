@@ -1,20 +1,11 @@
 Lib to convert slice of struct to xls file
 
-Example:
+How to use:
 ```go
-bytes, err := xlsx.Convert(result)
-if err != nil {
-    panic(err)
-}
-
-f, err := os.Create("tmp/myfile.xlsx")
-if err != nil {
-    panic(err)
-}
-defer f.Close()
-
-err = f.Write(bytes)
+file := excelize.NewFile()
+err := xlsx.Write(file, "Dogs", dogs)
 if err != nil {
     panic(err)
 }
 ```
+See example dir for more detail.

@@ -1,8 +1,6 @@
 package xlsx
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"math"
 	"reflect"
@@ -13,45 +11,51 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-// Convert converts slice to xlsx binary
+type File struct {
+}
+
+// Write adds new sheet with data
 // support tags:
 // name - column name
 // width - column width
 // divide - divide the number
 // round - round the number
-func Convert(v interface{}) ([]byte, error) {
-	if reflect.TypeOf(v).Kind() != reflect.Slice {
-		return nil, fmt.Errorf("slice only is allowed")
+func Write(file *excelize.File, sheetName string, data interface{}) error {
+	if reflect.TypeOf(data).Kind() != reflect.Slice {
+		return fmt.Errorf("slice only is allowed")
 	}
 
-	file := excelize.NewFile()
+	file.DeleteSheet(sheetName)
+	file.NewSheet(sheetName)
+	file.DeleteSheet("Sheet1")
+
 	style, _ := file.NewStyle(`{"font":{"bold":false,"italic":false,"family":"Helvetica Neue","size":10,"color":"#000000"}}`)
 
-	slice := reflect.ValueOf(v)
+	slice := reflect.ValueOf(data)
 	if slice.Len() > 0 {
 		// Set column names
 		e := slice.Index(0)
 		for i := 0; i < e.NumField(); i++ {
 			var field = e.Type().Field(i)
 
-			err := file.SetCellValue("Sheet1", getCellName(i, 1), getColumnName(field))
+			err := file.SetCellValue(sheetName, getCellName(i, 1), getColumnName(field))
 			if err != nil {
-				return nil, err
+				return err
 			}
-			file.SetCellStyle("Sheet1", getCellName(i, 1), getCellName(i, 1), style)
+			file.SetCellStyle(sheetName, getCellName(i, 1), getCellName(i, 1), style)
 
 			columnWidth := getColumnWidth(field)
 			if columnWidth != nil {
-				file.SetColWidth("Sheet1", getColumnLetter(i), getColumnLetter(i), *columnWidth)
+				file.SetColWidth(sheetName, getColumnLetter(i), getColumnLetter(i), *columnWidth)
 			}
 		}
 
-		file.SetRowHeight("Sheet1", 1, 18)
+		file.SetRowHeight(sheetName, 1, 18)
 
 		// Set rows
 		for rowi := 0; rowi < slice.Len(); rowi++ {
 
-			file.SetRowHeight("Sheet1", rowi+2, 18)
+			file.SetRowHeight(sheetName, rowi+2, 18)
 
 			element := slice.Index(rowi)
 			for columni := 0; columni < element.NumField(); columni++ {
@@ -68,19 +72,15 @@ func Convert(v interface{}) ([]byte, error) {
 					cellValue = getNumeric(e.Type().Field(columni), value)
 				}
 
-				err := file.SetCellValue("Sheet1", getCellName(columni, rowi+2), cellValue)
+				err := file.SetCellValue(sheetName, getCellName(columni, rowi+2), cellValue)
 				if err != nil {
-					return nil, err
+					return err
 				}
-				file.SetCellStyle("Sheet1", getCellName(columni, rowi+2), getCellName(columni, rowi+2), style)
+				file.SetCellStyle(sheetName, getCellName(columni, rowi+2), getCellName(columni, rowi+2), style)
 			}
 		}
 	}
-
-	var b bytes.Buffer
-	writer := bufio.NewWriter(&b)
-	_, err := file.WriteTo(writer)
-	return b.Bytes(), err
+	return nil
 }
 
 func getTag(field reflect.StructField, tag string) string {
