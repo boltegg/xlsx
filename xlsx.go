@@ -1,6 +1,8 @@
 package xlsx
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"math"
 	"reflect"
@@ -11,7 +13,17 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-type File struct {
+func EasyConvert(data interface{}) ([]byte, error) {
+	file := excelize.NewFile()
+	err := Write(file, "Data", data)
+	if err != nil {
+		return nil, err
+	}
+
+	var b bytes.Buffer
+	writer := bufio.NewWriter(&b)
+	_, err = file.WriteTo(writer)
+	return b.Bytes(), err
 }
 
 // Write adds new sheet with data
