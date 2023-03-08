@@ -41,7 +41,11 @@ func Write(file *excelize.File, sheetName string, data interface{}) error {
 	file.NewSheet(sheetName)
 	file.DeleteSheet("Sheet1")
 
-	style, _ := file.NewStyle(`{"font":{"bold":false,"italic":false,"family":"Helvetica Neue","size":10,"color":"#000000"}}`)
+	style, _ := file.NewStyle(&excelize.Style{Font: &excelize.Font{
+		Family: "Helvetica Neue",
+		Size:   10,
+		Color:  "#000000",
+	}})
 
 	slice := reflect.ValueOf(data)
 	if slice.Len() > 0 {
