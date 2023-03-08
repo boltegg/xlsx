@@ -84,6 +84,12 @@ func Write(file *excelize.File, sheetName string, data interface{}) error {
 					cellValue = getNumeric(e.Type().Field(columni), value)
 				}
 
+				if getTagBool(e.Type().Field(columni), "emptyIfZero") {
+					if f, ok := cellValue.(float64); ok && f == 0 {
+						cellValue = ""
+					}
+				}
+
 				err := file.SetCellValue(sheetName, getCellName(columni, rowi+2), cellValue)
 				if err != nil {
 					return err
@@ -104,6 +110,16 @@ func getTag(field reflect.StructField, tag string) string {
 		}
 	}
 	return ""
+}
+
+func getTagBool(field reflect.StructField, tag string) bool {
+	tags := field.Tag.Get("xlsx")
+	for _, tagValue := range strings.Split(tags, ";") {
+		if tagValue == tag {
+			return true
+		}
+	}
+	return false
 }
 
 func getColumnName(field reflect.StructField) string {
