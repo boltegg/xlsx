@@ -54,6 +54,11 @@ func Write(file *excelize.File, sheetName string, data interface{}) error {
 		for i := 0; i < e.NumField(); i++ {
 			var field = e.Type().Field(i)
 
+			// Skip column if tag is "-"
+			if field.Tag.Get("xlsx") == "-" {
+				continue
+			}
+
 			err := file.SetCellValue(sheetName, getCellName(i, 1), getColumnName(field))
 			if err != nil {
 				return err
@@ -75,6 +80,12 @@ func Write(file *excelize.File, sheetName string, data interface{}) error {
 
 			element := slice.Index(rowi)
 			for columni := 0; columni < element.NumField(); columni++ {
+
+				// Skip column if tag is "-"
+				if element.Type().Field(columni).Tag.Get("xlsx") == "-" {
+					continue
+				}
+
 				value := element.Field(columni)
 				if value.Kind() == reflect.Ptr {
 					value = value.Elem()
