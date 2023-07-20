@@ -80,19 +80,22 @@ func Write(file *excelize.File, sheetName string, data interface{}) error {
 					value = value.Elem()
 				}
 
-				var cellValue = value.Interface()
+				var cellValue interface{} = ""
+				if value.IsValid() {
+					cellValue = value.Interface()
 
-				if t, ok := value.Interface().(time.Time); ok {
-					cellValue = t.Format("2006-01-02 15:04:05")
-				} else if isNumeric(value) {
-					cellValue = getNumeric(e.Type().Field(columni), value)
-				}
+					if t, ok := value.Interface().(time.Time); ok {
+						cellValue = t.Format("2006-01-02 15:04:05")
+					} else if isNumeric(value) {
+						cellValue = getNumeric(e.Type().Field(columni), value)
+					}
 
-				if getTagBool(e.Type().Field(columni), "emptyIfZero") {
-					if f, ok := cellValue.(float64); ok && f == 0 {
-						cellValue = ""
-					} else if t, ok := value.Interface().(time.Time); ok && t.IsZero() {
-						cellValue = ""
+					if getTagBool(e.Type().Field(columni), "emptyIfZero") {
+						if f, ok := cellValue.(float64); ok && f == 0 {
+							cellValue = ""
+						} else if t, ok := value.Interface().(time.Time); ok && t.IsZero() {
+							cellValue = ""
+						}
 					}
 				}
 
