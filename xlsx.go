@@ -102,7 +102,7 @@ func Write(file *excelize.File, sheetName string, data interface{}) error {
 					}
 
 					if getTagBool(e.Type().Field(columni), "emptyIfZero") {
-						if f, ok := cellValue.(float64); ok && f == 0 {
+						if fmt.Sprint(cellValue) == "0" {
 							cellValue = ""
 						} else if t, ok := value.Interface().(time.Time); ok && t.IsZero() {
 							cellValue = ""
