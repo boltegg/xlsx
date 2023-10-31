@@ -59,11 +59,11 @@ func Write(file *excelize.File, sheetName string, data interface{}) error {
 				continue
 			}
 
-			err := file.SetCellValue(sheetName, getCellName(i, 1), getColumnName(field))
+			err := file.SetCellValue(sheetName, GetCellName(i, 1), getColumnName(field))
 			if err != nil {
 				return err
 			}
-			file.SetCellStyle(sheetName, getCellName(i, 1), getCellName(i, 1), style)
+			file.SetCellStyle(sheetName, GetCellName(i, 1), GetCellName(i, 1), style)
 
 			columnWidth := getColumnWidth(field)
 			if columnWidth != nil {
@@ -110,11 +110,11 @@ func Write(file *excelize.File, sheetName string, data interface{}) error {
 					}
 				}
 
-				err := file.SetCellValue(sheetName, getCellName(columni, rowi+2), cellValue)
+				err := file.SetCellValue(sheetName, GetCellName(columni, rowi+2), cellValue)
 				if err != nil {
 					return err
 				}
-				file.SetCellStyle(sheetName, getCellName(columni, rowi+2), getCellName(columni, rowi+2), style)
+				file.SetCellStyle(sheetName, GetCellName(columni, rowi+2), GetCellName(columni, rowi+2), style)
 			}
 		}
 	}
@@ -192,7 +192,7 @@ func getNumeric(field reflect.StructField, v reflect.Value) float64 {
 	return f
 }
 
-func getCellName(columnIdx int, rowIdx int) string {
+func GetCellName(columnIdx int, rowIdx int) string {
 	return fmt.Sprintf("%s%d", getColumnLetter(columnIdx), rowIdx)
 }
 
