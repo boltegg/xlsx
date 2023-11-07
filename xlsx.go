@@ -121,6 +121,30 @@ func Write(file *excelize.File, sheetName string, data interface{}) error {
 	return nil
 }
 
+// WriteMatrix adds data to the sheet
+// start - start cell name
+func WriteMatrix(file *excelize.File, sheetName string, start string, data [][]interface{}) error {
+	var (
+		startColumnIdx int
+		startRowIdx    int
+	)
+
+	if len(start) > 0 {
+		startColumnIdx = int(start[0] - 'A')
+		startRowIdx, _ = strconv.Atoi(start[1:])
+	}
+
+	for rowi := 0; rowi < len(data); rowi++ {
+		for columni := 0; columni < len(data[rowi]); columni++ {
+			err := file.SetCellValue(sheetName, GetCellName(startColumnIdx+columni, startRowIdx+rowi), data[rowi][columni])
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func getTag(field reflect.StructField, tag string) string {
 	tags := field.Tag.Get("xlsx")
 	for _, tagValue := range strings.Split(tags, ";") {
