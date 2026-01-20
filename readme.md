@@ -32,5 +32,6 @@ Notes:
 - `Unmarshal` reads native Excel types (numbers, booleans, date serials) to avoid string-conversion issues.
 - For date/time fields, use `time_format` and `locale` tags when the sheet stores dates as text.
 - For integer fields, values are parsed without floating-point to preserve large numbers exactly.
+ - For `string` destinations, numeric-looking values are preserved as full digits (no scientific notation). Phone numbers like `380963334455`, `+380...`, or `088...` are unmarshalled verbatim.
 
 See the example directory for more details.

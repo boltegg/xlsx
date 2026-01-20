@@ -86,7 +86,7 @@ func unmarshal() {
 
 type Customer struct {
 	Name             string     `xlsx:"name:Имя"`
-	Phone            int64      `xlsx:"name:Телефон"`
+	Phone            string     `xlsx:"name:Телефон"`
 	Email            string     `xlsx:"name:Email"`
 	Categories       string     `xlsx:"name:Категории"`
 	BirthDate        *time.Time `xlsx:"name:Дата рождения;locale:Europe/Kyiv;time_format:02-01-2006"`

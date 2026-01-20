@@ -99,11 +99,38 @@ func TestUnmarshalCustomers(t *testing.T) {
 			t.Errorf("Name mismatch: got %q want %q", c.Name, firstRow[idx])
 		}
 	}
-	if idx, ok := headerIdx["Телефон"]; ok && idx < len(firstRow) {
-		if c.Phone != firstRow[idx] {
-			t.Errorf("Phone mismatch: got %q want %q", c.Phone, firstRow[idx])
-		}
-	}
+ if idx, ok := headerIdx["Телефон"]; ok && idx < len(firstRow) {
+        exp := firstRow[idx]
+        trimmed := strings.TrimSpace(exp)
+        // If the sheet shows scientific notation in formatted value, derive expected from RAW value instead.
+        if strings.ContainsAny(trimmed, "eE") && isNumericLike(trimmed) {
+            // Locate the same cell coordinates to fetch RAW
+            col := idx
+            // Data row index in the sheet corresponds to position of firstRow + 1 (because header is row 1)
+            dataRow := 0
+            for i := 1; i < len(rows); i++ {
+                if !isRowEmpty(rows[i]) {
+                    dataRow = i + 1 // Excel rows are 1-based
+                    break
+                }
+            }
+            cell := GetCellName(col, dataRow)
+            raw, _ := f.GetCellValue(sheet, cell, excelize.Options{RawCellValue: true})
+            if rawDec, ok := toIntegerDecimalString(strings.TrimSpace(raw)); ok {
+                if c.Phone != rawDec {
+                    t.Errorf("Phone mismatch: got %q want %q (from RAW)", c.Phone, rawDec)
+                }
+            } else {
+                if c.Phone != strings.TrimSpace(raw) {
+                    t.Errorf("Phone mismatch: got %q want %q (raw)", c.Phone, raw)
+                }
+            }
+        } else {
+            if c.Phone != exp {
+                t.Errorf("Phone mismatch: got %q want %q", c.Phone, exp)
+            }
+        }
+    }
 
 	// Numbers
 	if idx, ok := headerIdx["Потратил, ₴"]; ok && idx < len(firstRow) {

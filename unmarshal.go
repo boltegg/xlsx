@@ -235,7 +235,41 @@ func unmarshalTyped(f *excelize.File, sheet string, v interface{}) error {
 func convertCell(raw, formatted string, ctype excelize.CellType, destKind reflect.Kind, timeFormat string, loc *time.Location, use1904 bool) (reflect.Value, bool) {
     switch destKind {
     case reflect.String:
-        return reflect.ValueOf(formatted), true
+        // String destination rules:
+        // - If the formatted value is explicitly textual with a leading '+' or a leading zero-only digits,
+        //   preserve it exactly as-is (e.g., +380..., 0887...).
+        // - Otherwise, attempt to normalize numeric/scientific representations using the raw value first,
+        //   then the formatted value. This avoids scientific notation like 3.8096E+11.
+        fm := formatted
+        fmTrim := strings.TrimSpace(fm)
+        if fmTrim != "" {
+            if strings.HasPrefix(fmTrim, "+") {
+                return reflect.ValueOf(fm), true
+            }
+            if len(fmTrim) > 1 && fmTrim[0] == '0' && isAllDigits(fmTrim) {
+                return reflect.ValueOf(fm), true
+            }
+        }
+
+        // Prefer raw if present and looks numeric/scientific
+        r := strings.TrimSpace(raw)
+        if r != "" && isNumericLike(r) {
+            if dec, ok := toIntegerDecimalString(r); ok {
+                return reflect.ValueOf(dec), true
+            }
+            // If can't coerce to exact integer, still prefer raw to avoid formatted scientific output
+            return reflect.ValueOf(r), true
+        }
+
+        // Fallback to formatted numeric/scientific normalization
+        if fmTrim != "" && isNumericLike(fmTrim) {
+            if dec, ok := toIntegerDecimalString(fmTrim); ok {
+                return reflect.ValueOf(dec), true
+            }
+        }
+
+        // As a last resort, return formatted as-is.
+        return reflect.ValueOf(fm), true
     case reflect.Bool:
         // excel boolean or parse string
         if ctype == excelize.CellTypeBool {
@@ -578,4 +612,77 @@ func toIntegerDecimalString(s string) (string, bool) {
         sign = ""
     }
     return sign + intPart, true
+}
+
+// isAllDigits reports whether s contains only ASCII digits 0-9.
+func isAllDigits(s string) bool {
+    if s == "" {
+        return false
+    }
+    for i := 0; i < len(s); i++ {
+        if s[i] < '0' || s[i] > '9' {
+            return false
+        }
+    }
+    return true
+}
+
+// isNumericLike reports whether s looks like a numeric literal possibly in scientific notation.
+// Allowed pattern (simplified): optional sign, digits with optional single dot, optional exponent (e/E followed by optional sign and digits).
+func isNumericLike(s string) bool {
+    if s == "" {
+        return false
+    }
+    i := 0
+    // sign
+    if s[i] == '+' || s[i] == '-' {
+        i++
+        if i >= len(s) {
+            return false
+        }
+    }
+    // digits (at least one)
+    digits := 0
+    for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+        i++
+        digits++
+    }
+    // optional dot and fractional digits
+    if i < len(s) && s[i] == '.' {
+        i++
+        // fractional digits (at least one to be numeric-like)
+        frac := 0
+        for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+            i++
+            frac++
+        }
+        if digits == 0 && frac == 0 {
+            return false
+        }
+    } else if digits == 0 {
+        return false
+    }
+    // optional exponent
+    if i < len(s) && (s[i] == 'e' || s[i] == 'E') {
+        i++
+        if i >= len(s) {
+            return false
+        }
+        if s[i] == '+' || s[i] == '-' {
+            i++
+            if i >= len(s) {
+                return false
+            }
+        }
+        expDigits := 0
+        for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+            i++
+            expDigits++
+        }
+        if expDigits == 0 {
+            return false
+        }
+    }
+    // no other characters allowed
+    return i == len(s)
 }
