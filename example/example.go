@@ -66,18 +66,18 @@ func writeFile() {
 
 func unmarshal() {
 
-    f, err := excelize.OpenFile("testdata/customers.xlsx")
-    if err != nil {
-        fmt.Println(err)
-        return
-    }
-    defer f.Close()
+	f, err := excelize.OpenFile("testdata/customers.xlsx")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer f.Close()
 
-    var customers []Customer
-    err = xlsx.Unmarshal(f, &customers)
-    if err != nil {
-        panic(err)
-    }
+	var customers []Customer
+	err = xlsx.Unmarshal(f, &customers)
+	if err != nil {
+		panic(err)
+	}
 
 	for i, customer := range customers {
 		fmt.Println(i, customer)
@@ -86,7 +86,7 @@ func unmarshal() {
 
 type Customer struct {
 	Name             string     `xlsx:"name:Имя"`
-	Phone            string     `xlsx:"name:Телефон"`
+	Phone            int64      `xlsx:"name:Телефон"`
 	Email            string     `xlsx:"name:Email"`
 	Categories       string     `xlsx:"name:Категории"`
 	BirthDate        *time.Time `xlsx:"name:Дата рождения;locale:Europe/Kyiv;time_format:02-01-2006"`

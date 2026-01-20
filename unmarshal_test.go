@@ -1,6 +1,7 @@
 package xlsx
 
 import (
+    "strings"
     "testing"
     "time"
 
@@ -23,6 +24,16 @@ type testCustomer struct {
 	Comment          string     `xlsx:"name:Комментарий"`
 	AdditionalPhone  string     `xlsx:"name:Дополнительный телефон"`
 	MarketingConsent bool       `xlsx:"name:Согласен на получение рассылок"`
+}
+
+// isRowEmpty reports whether all cells in the row are empty strings.
+func isRowEmpty(row []string) bool {
+    for _, s := range row {
+        if strings.TrimSpace(s) != "" {
+            return false
+        }
+    }
+    return true
 }
 
 func TestUnmarshalCustomers(t *testing.T) {

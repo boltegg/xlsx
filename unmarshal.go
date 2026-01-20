@@ -10,6 +10,13 @@ import (
     "github.com/xuri/excelize/v2"
 )
 
+// Internal scan limits to avoid unbounded sheet traversal.
+const (
+    headerColumnScanLimit = 1024 // max columns to probe for headers in row 1
+    emptyHeaderTailGap    = 16   // stop header scan after this many consecutive empty headers
+    emptyDataRowsGap      = 50   // stop data scan after this many consecutive empty rows
+)
+
 // Unmarshal reads data from the first sheet of the provided excelize.File
 // and populates the destination slice of structs.
 // The destination v must be a pointer to a slice whose element type is a struct or *struct.
@@ -32,16 +39,7 @@ func Unmarshal(file *excelize.File, v interface{}) (err error) {
     return unmarshalTyped(file, sheet, v)
 }
 
-// Note: legacy [][]string-based unmarshal path was removed in favor of typed reading.
-
-func isRowEmpty(row []string) bool {
-	for _, s := range row {
-		if strings.TrimSpace(s) != "" {
-			return false
-		}
-	}
-	return true
-}
+//
 
 // unmarshalTyped reads cells directly from excelize.File to preserve native types
 // (numeric, boolean, date serials) instead of relying on [][]string from GetRows.
@@ -67,12 +65,12 @@ func unmarshalTyped(f *excelize.File, sheet string, v interface{}) error {
         return fmt.Errorf("slice element must be a struct or pointer to struct")
     }
 
-    // Build header map from first row (formatted values)
+    // Build header map from the first row (formatted values)
     headerMap := map[string]int{}
     // Scan columns to the right until we hit a tail of empty headers
     emptyTail := 0
     seenAny := false
-    for c := 0; c < 1024; c++ { // reasonable upper bound
+    for c := 0; c < headerColumnScanLimit; c++ {
         cell := GetCellName(c, 1)
         val, err := f.GetCellValue(sheet, cell)
         if err != nil {
@@ -82,7 +80,7 @@ func unmarshalTyped(f *excelize.File, sheet string, v interface{}) error {
         if h == "" {
             if seenAny {
                 emptyTail++
-                if emptyTail >= 16 { // stop after a gap
+                if emptyTail >= emptyHeaderTailGap { // stop after a gap
                     break
                 }
             }
@@ -164,7 +162,7 @@ func unmarshalTyped(f *excelize.File, sheet string, v interface{}) error {
         }
         if empty {
             consecutiveEmpty++
-            if consecutiveEmpty >= 50 { // stop after long gap
+            if consecutiveEmpty >= emptyDataRowsGap { // stop after long gap
                 break
             }
             continue
@@ -232,6 +230,8 @@ func unmarshalTyped(f *excelize.File, sheet string, v interface{}) error {
     return nil
 }
 
+// convertCell converts a cell's raw and formatted value into a reflect.Value
+// suitable for assigning to a destination field of kind destKind.
 func convertCell(raw, formatted string, ctype excelize.CellType, destKind reflect.Kind, timeFormat string, loc *time.Location, use1904 bool) (reflect.Value, bool) {
     switch destKind {
     case reflect.String:
@@ -249,12 +249,10 @@ func convertCell(raw, formatted string, ctype excelize.CellType, destKind reflec
     case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
         var i64 int64
         var ok bool
-        if ctype == excelize.CellTypeNumber {
-            // Prefer parsing the raw numeric text exactly to avoid float rounding/precision loss
-            if v, okRaw := parseRawNumberToInt64(strings.TrimSpace(raw)); okRaw {
-                i64 = v
-                ok = true
-            }
+        // Always try raw first to avoid any formatting/rounding issues, regardless of type
+        if v, okRaw := parseRawNumberToInt64(strings.TrimSpace(raw)); okRaw {
+            i64 = v
+            ok = true
         }
         if !ok {
             // Fallback to formatted text parsing (cells stored as text)
@@ -278,11 +276,10 @@ func convertCell(raw, formatted string, ctype excelize.CellType, destKind reflec
     case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
         var u64 uint64
         var ok bool
-        if ctype == excelize.CellTypeNumber {
-            if v, okRaw := parseRawNumberToUint64(strings.TrimSpace(raw)); okRaw {
-                u64 = v
-                ok = true
-            }
+        // Always try raw first
+        if v, okRaw := parseRawNumberToUint64(strings.TrimSpace(raw)); okRaw {
+            u64 = v
+            ok = true
         }
         if !ok {
             if i64, ok2 := parseInt(formatted); ok2 && i64 >= 0 {
@@ -329,7 +326,7 @@ func convertCell(raw, formatted string, ctype excelize.CellType, destKind reflec
         return reflect.ValueOf(f64), true
     case reflect.Struct:
         // time.Time only
-        // Strategy: if numeric cell, treat as Excel date serial; else try to parse string with provided or common formats
+        // If numeric cell, treat as Excel date serial; otherwise parse string with provided/common formats.
         if ctype == excelize.CellTypeNumber {
             if f, e := strconv.ParseFloat(strings.TrimSpace(raw), 64); e == nil {
                 if t, e := excelize.ExcelDateToTime(f, use1904); e == nil {
@@ -352,13 +349,13 @@ func convertCell(raw, formatted string, ctype excelize.CellType, destKind reflec
 //
 
 func parseBool(s string) bool {
-	ls := strings.ToLower(strings.TrimSpace(s))
-	switch ls {
-	case "true", "1", "yes", "y", "да", "si", "on":
-		return true
-	default:
-		return false
-	}
+    ls := strings.ToLower(strings.TrimSpace(s))
+    switch ls {
+    case "true", "1", "yes", "y", "да", "si", "on":
+        return true
+    default:
+        return false
+    }
 }
 
 func parseInt(s string) (int64, bool) {
