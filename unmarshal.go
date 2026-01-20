@@ -250,12 +250,14 @@ func convertCell(raw, formatted string, ctype excelize.CellType, destKind reflec
         var i64 int64
         var ok bool
         if ctype == excelize.CellTypeNumber {
-            if f, e := strconv.ParseFloat(strings.TrimSpace(raw), 64); e == nil {
-                i64 = int64(f)
+            // Prefer parsing the raw numeric text exactly to avoid float rounding/precision loss
+            if v, okRaw := parseRawNumberToInt64(strings.TrimSpace(raw)); okRaw {
+                i64 = v
                 ok = true
             }
         }
         if !ok {
+            // Fallback to formatted text parsing (cells stored as text)
             i64, ok = parseInt(formatted)
         }
         if !ok {
@@ -277,8 +279,8 @@ func convertCell(raw, formatted string, ctype excelize.CellType, destKind reflec
         var u64 uint64
         var ok bool
         if ctype == excelize.CellTypeNumber {
-            if f, e := strconv.ParseFloat(strings.TrimSpace(raw), 64); e == nil && f >= 0 {
-                u64 = uint64(f)
+            if v, okRaw := parseRawNumberToUint64(strings.TrimSpace(raw)); okRaw {
+                u64 = v
                 ok = true
             }
         }
@@ -462,4 +464,121 @@ func parseTime(s string, fmtStr string, loc *time.Location) (time.Time, bool) {
 		}
 	}
 	return time.Time{}, false
+}
+
+// parseRawNumberToInt64 attempts to parse an exact integer from a raw Excel numeric string.
+// It supports plain decimal and scientific notation (e.g., 1.23E+03) if the value is integral
+// after applying exponent. It avoids float64 to prevent precision loss.
+func parseRawNumberToInt64(s string) (int64, bool) {
+    if s = strings.TrimSpace(s); s == "" {
+        return 0, false
+    }
+    if is, ok := toIntegerDecimalString(s); ok {
+        v, err := strconv.ParseInt(is, 10, 64)
+        if err != nil {
+            return 0, false
+        }
+        return v, true
+    }
+    return 0, false
+}
+
+// parseRawNumberToUint64 is the unsigned variant of parseRawNumberToInt64.
+func parseRawNumberToUint64(s string) (uint64, bool) {
+    if s = strings.TrimSpace(s); s == "" {
+        return 0, false
+    }
+    if strings.HasPrefix(s, "-") {
+        return 0, false
+    }
+    if is, ok := toIntegerDecimalString(s); ok {
+        v, err := strconv.ParseUint(is, 10, 64)
+        if err != nil {
+            return 0, false
+        }
+        return v, true
+    }
+    return 0, false
+}
+
+// toIntegerDecimalString converts a numeric string that may contain a decimal point
+// and/or scientific notation into a base-10 integer string, if and only if the value
+// represents an exact integer. Returns (value, true) on success.
+func toIntegerDecimalString(s string) (string, bool) {
+    s = strings.TrimSpace(s)
+    if s == "" {
+        return "", false
+    }
+    sign := ""
+    if s[0] == '+' || s[0] == '-' {
+        if s[0] == '-' {
+            sign = "-"
+        }
+        s = s[1:]
+    }
+    // Split exponent if present
+    exp := 0
+    if idx := strings.IndexAny(s, "eE"); idx != -1 {
+        mant := s[:idx]
+        expStr := s[idx+1:]
+        // Allow optional +/-
+        if e, err := strconv.Atoi(expStr); err == nil {
+            s = mant
+            exp = e
+        } else {
+            return "", false
+        }
+    }
+    // Split decimal point
+    intPart := s
+    fracLen := 0
+    if dot := strings.IndexByte(s, '.'); dot != -1 {
+        intPart = s[:dot] + s[dot+1:]
+        fracLen = len(s) - dot - 1
+    }
+    // Remove leading zeros in intPart for normalization (but keep at least one digit)
+    intPart = strings.TrimLeft(intPart, "0")
+    if intPart == "" {
+        intPart = "0"
+    }
+    // Effective exponent after removing decimal point
+    totalExp := exp - fracLen
+    if totalExp < 0 {
+        // Move decimal point to the left by -totalExp; the result is integer only
+        // if intPart ends with -totalExp zeros (or intPart is all zeros).
+        k := -totalExp
+        if intPart == "0" {
+            // value is zero regardless of exponent
+            return sign + "0", true
+        }
+        if len(intPart) < k {
+            // e.g., 12 with k=3 => 0.012 not integer
+            return "", false
+        }
+        // ensure last k digits are zeros
+        for i := 0; i < k; i++ {
+            if intPart[len(intPart)-1-i] != '0' {
+                return "", false
+            }
+        }
+        intPart = intPart[:len(intPart)-k]
+        if intPart == "" {
+            intPart = "0"
+        }
+    } else if totalExp > 0 {
+        // Append zeros (shift decimal to the right)
+        intPart = intPart + strings.Repeat("0", totalExp)
+    }
+    // Remove any leading zeros again (except keep one zero if all zeros)
+    if intPart != "0" {
+        intPart = strings.TrimLeft(intPart, "0")
+        if intPart == "" {
+            intPart = "0"
+        }
+    }
+    if sign == "-" && intPart == "0" {
+        // normalize -0 to 0
+        sign = ""
+    }
+    return sign + intPart, true
 }
