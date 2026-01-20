@@ -146,14 +146,15 @@ func WriteMatrix(file *excelize.File, sheetName string, start string, data [][]i
 }
 
 func getTag(field reflect.StructField, tag string) string {
-	tags := field.Tag.Get("xlsx")
-	for _, tagValue := range strings.Split(tags, ";") {
-		tagSplit := strings.Split(tagValue, ":")
-		if len(tagSplit) == 2 && tagSplit[0] == tag {
-			return tagSplit[1]
-		}
-	}
-	return ""
+    tags := field.Tag.Get("xlsx")
+    for _, tagValue := range strings.Split(tags, ";") {
+        // Split only on the first colon to allow values that contain colons (e.g., time formats like "2006-01-02 15:04")
+        parts := strings.SplitN(tagValue, ":", 2)
+        if len(parts) == 2 && parts[0] == tag {
+            return parts[1]
+        }
+    }
+    return ""
 }
 
 func getTagBool(field reflect.StructField, tag string) bool {
@@ -221,9 +222,15 @@ func GetCellName(columnIdx int, rowIdx int) string {
 }
 
 func getColumnLetter(columnIdx int) string {
-	if columnIdx < 26 {
-		return string('A' + columnIdx)
-	} else {
-		return string('A'-1+columnIdx/26) + string('A'+columnIdx%26)
-	}
+    // Convert zero-based column index to Excel-style letters (A, B, ..., Z, AA, AB, ...)
+    if columnIdx < 0 {
+        return ""
+    }
+    var buf []byte
+    for columnIdx >= 0 {
+        rem := columnIdx % 26
+        buf = append([]byte{'A' + byte(rem)}, buf...)
+        columnIdx = columnIdx/26 - 1
+    }
+    return string(buf)
 }
