@@ -1,10 +1,10 @@
 package xlsx
 
 import (
-	"testing"
-	"time"
+    "testing"
+    "time"
 
-	"github.com/xuri/excelize/v2"
+    "github.com/xuri/excelize/v2"
 )
 
 type testCustomer struct {
@@ -38,25 +38,24 @@ func TestUnmarshalCustomers(t *testing.T) {
 	}
 	sheet := sheets[0]
 
-	rows, err := f.GetRows(sheet)
-	if err != nil {
-		t.Fatalf("failed to read rows: %v", err)
-	}
-	if len(rows) == 0 {
-		t.Fatalf("no rows found in sheet")
-	}
+ var customers []testCustomer
+ if err := Unmarshal(f, &customers); err != nil {
+     t.Fatalf("Unmarshal error: %v", err)
+ }
 
-	var customers []testCustomer
-	if err := Unmarshal(rows, &customers); err != nil {
-		t.Fatalf("Unmarshal error: %v", err)
-	}
-
-	// Expected count: number of non-empty rows after header
-	exp := 0
-	for i := 1; i < len(rows); i++ {
-		if !isRowEmpty(rows[i]) {
-			exp++
-		}
+ // Expected count: number of non-empty rows after header
+ rows, err := f.GetRows(sheet)
+ if err != nil {
+     t.Fatalf("failed to read rows: %v", err)
+ }
+ if len(rows) == 0 {
+     t.Fatalf("no rows found in sheet")
+ }
+ exp := 0
+ for i := 1; i < len(rows); i++ {
+     if !isRowEmpty(rows[i]) {
+         exp++
+     }
 	}
 	if len(customers) != exp {
 		t.Fatalf("unexpected customers count: got %d, want %d", len(customers), exp)

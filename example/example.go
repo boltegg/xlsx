@@ -66,30 +66,18 @@ func writeFile() {
 
 func unmarshal() {
 
-	f, err := excelize.OpenFile("testdata/customers.xlsx")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer f.Close()
+    f, err := excelize.OpenFile("testdata/customers.xlsx")
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    defer f.Close()
 
-	sheets := f.GetSheetList()
-	if len(sheets) == 0 {
-		panic("no sheet found")
-	}
-
-	sheet := sheets[0]
-
-	rows, err := f.GetRows(sheet)
-	if err != nil {
-		panic(err)
-	}
-
-	var customers []Customer
-	err = xlsx.Unmarshal(rows, &customers)
-	if err != nil {
-		panic(err)
-	}
+    var customers []Customer
+    err = xlsx.Unmarshal(f, &customers)
+    if err != nil {
+        panic(err)
+    }
 
 	for i, customer := range customers {
 		fmt.Println(i, customer)
